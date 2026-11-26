@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>WMK Carrier Command v0.2.0</title>
+  <title>WMK Carrier Command v0.3.0</title>
   <style>
     :root {
       --ink: #e9f3f3;
@@ -781,7 +781,7 @@
         <div class="stat-grid">
           <div class="stat"><small>Casco</small><b id="shipHp">—</b></div>
           <div class="stat"><small>Velocidade</small><b id="shipSpeed">—</b></div>
-          <div class="stat"><small>Esquadrão</small><b>3 aeronaves</b></div>
+          <div class="stat"><small>Esquadrão</small><b>12 aeronaves</b></div>
         </div>
       </div>
 
@@ -867,7 +867,7 @@
       </div>
     </div>
 
-    <aside id="command" class="glass"><div class="panel-overline">CENTRO DE COMANDO · M MAPA</div><canvas id="radar" width="200" height="160"></canvas><p id="commandStatus"></p><button id="modeBtn">TAB · Alternar comando / voo</button><button id="viewBtn">V · Alternar câmera</button><button id="pauseBtn">P · Pausar</button><p>1 foguetes · 2 torpedos · 3 bombas (no convés)<br>R retorna / lança · clique no mapa para mover o porta-aviões.</p><button id="abortBtn">Encerrar operação</button></aside><div class="control-hint">
+    <aside id="command" class="glass"><div class="panel-overline">CENTRO DE COMANDO · M MAPA</div><canvas id="radar" width="200" height="160"></canvas><p id="commandStatus"></p><div id="squadList" style="display:grid;gap:4px"><button id="sq0" style="text-align:left"></button><button id="sq1" style="text-align:left"></button><button id="sq2" style="text-align:left"></button><button id="sq3" style="text-align:left"></button></div><button id="modeBtn">TAB · Alternar comando / voo</button><button id="viewBtn">V · Alternar câmera</button><button id="pauseBtn">P · Pausar</button><p>1 Falcão · 2 Tubarão · 3 Águia · 4 Tritão<br>R retorna / lança · clique no mapa para mover o porta-aviões.</p><button id="abortBtn">Encerrar operação</button></aside><div class="control-hint">
       <b>W / S</b> velocidade &nbsp; <b>A / D</b> curva<br>
       <b>E / Q</b> altitude &nbsp; <b>1 / 2 / 3</b> armamento<br>
       <b>ESPAÇO</b> atacar &nbsp; <b>R</b> retorno ao porta-aviões
@@ -1362,9 +1362,9 @@
       for (let i = 0; i < game.planeMeshes.length; i++) {
         const aircraft = game.planeMeshes[i];
         aircraft.visible = i < game.planeCount;
-        const offset = offsets[i].clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), game.yaw);
+        const offset = (game.docked?new THREE.Vector3(0,0,(i-1)*3):offsets[i].clone()).applyAxisAngle(new THREE.Vector3(0, 1, 0), game.yaw);
         aircraft.position.copy(game.planePos).add(offset);
-        aircraft.rotation.set(0, game.yaw, 0);
+        aircraft.rotation.set(0, game.yaw, 0);if(aircraft.userData.rotor&&!paused)aircraft.userData.rotor.rotation.y+=.45;
       }
     }
 
@@ -1377,6 +1377,8 @@
     }
 
     const missions = [{name:'ACADEMIA NAVAL',hp:9000,move:0,pressure:0,reserve:9},{name:'PATRULHA INIMIGA',hp:16000,move:4,pressure:35,reserve:9},{name:'DEFESA DA FROTA',hp:22000,move:7,pressure:100,reserve:12}];
+    let squads=[], activeSquad=0;
+    const profiles=[{name:'Falcão',weapon:'rockets',speed:34,min:19,max:55,turn:1.15,alt:32,ammo:3},{name:'Tubarão',weapon:'torpedoes',speed:24,min:12,max:36,turn:.63,alt:18,ammo:2},{name:'Águia',weapon:'bombs',speed:29,min:15,max:43,turn:.82,alt:48,ammo:2},{name:'Tritão',weapon:'rockets',speed:12,min:0,max:23,turn:1.5,alt:22,ammo:3}];
     let mission, reserve, carrierHp, carrierMax, rounds, commandMode, cameraMode, paused, destination, targetRing, elapsed, selectedLoadout;
     function setupBattle() {
       clearBattleGroup();
@@ -1407,7 +1409,7 @@
       game.aaTimer = 0;
       game.damageDone = 0;
 
-      mission=missions[Number($('missionSelect').value)]||missions[0]; reserve=mission.reserve; carrierMax=ship.hp; carrierHp=carrierMax; rounds=2; commandMode=false; cameraMode=0; paused=false; destination=null; elapsed=0; selectedLoadout='rockets'; $('pauseBtn').textContent='P · Pausar'; document.querySelector('.mission-title').textContent=mission.name;
+      mission=missions[Number($('missionSelect').value)]||missions[0]; reserve=mission.reserve; carrierMax=ship.hp; carrierHp=carrierMax; rounds=profiles[activeSquad].ammo; commandMode=false; cameraMode=0; paused=false; destination=null; elapsed=0; selectedLoadout='rockets'; $('pauseBtn').textContent='P · Pausar'; document.querySelector('.mission-title').textContent=mission.name;
       game.enemyMaxHp = mission.hp + (ship.tier - 4) * 950;
       game.enemyHp = game.enemyMaxHp;
 
@@ -1437,7 +1439,12 @@
         game.planeMeshes.push(plane);
       }
 
-      updateFormation();
+      squads=[]; activeSquad=0;
+      for(let i=0;i<4;i++){
+        const p=profiles[i], meshes=i===0?game.planeMeshes:Array.from({length:3},()=>{const m=makeSquadAircraft(i,nation.paint);battleGroup.add(m);return m;});
+        squads.push({planeMeshes:meshes,planePos:new THREE.Vector3(i===0?0:-4+i*2,i===0?p.alt:3,i===0?76:112+i*6),yaw:0,speed:i===0?p.speed:0,altitude:i===0?p.alt:3,planeCount:3,airHealth:100,returning:false,docked:i!==0,rearmTimer:0,aaTimer:0,cooldown:0,weapon:p.weapon,rounds:p.ammo,reserve:Math.floor(mission.reserve/4)});
+      }
+      loadSquad(0); updateFormation(); updateSquadCards();
       game.battleActive = true;
       game.battleWon = false;
       game.hudTimer = 0;
@@ -1596,7 +1603,17 @@
       }
     };
 
+    const squadFields=['planeMeshes','planePos','yaw','speed','altitude','planeCount','airHealth','returning','docked','rearmTimer','aaTimer','cooldown','weapon'];
+    function saveSquad(){if(!squads[activeSquad])return; const q=squads[activeSquad];for(const k of squadFields)q[k]=game[k];q.rounds=rounds;q.reserve=reserve;}
+    function loadSquad(i){activeSquad=i;const q=squads[i];for(const k of squadFields)game[k]=q[k];rounds=q.rounds;reserve=q.reserve;selectedLoadout=q.weapon;}
+    function selectSquad(i){if(!game.battleActive||paused||!squads[i])return;saveSquad();loadSquad(i);commandMode=false;game.keys={};if(game.docked&&game.rearmTimer<=0&&game.planeCount>0)beginReturn();updateSquadCards();updateBattleHUD(true);}
+    function makeSquadAircraft(i,color){
+      if(i!==3){const m=makeAircraft(i===1?0x557b65:0x8c8067);m.scale.set(i===1?1.1:.88,1,i===1?1.22:1.05);return m;}
+      const m=new THREE.Group(); addBox(m,[2.2,1.8,5.3],0x435b53,[0,0,0]);addBox(m,[1.9,1.2,1.4],0x83bbc4,[0,.25,-2.4]);addBox(m,[.45,.55,5],0x435b53,[0,.25,4]);addBox(m,[.25,1.4,1],0x435b53,[0,.9,6]);addBox(m,[2.7,.18,.22],0x222d32,[0,-1,0]);addBox(m,[2.7,.18,.22],0x222d32,[0,-1,2]);const rotor=new THREE.Group();rotor.position.y=1.3;addBox(rotor,[10,.09,.35],0x222d32,[0,0,0]);addBox(rotor,[.35,.09,10],0x222d32,[0,0,0]);m.add(rotor);m.userData.rotor=rotor;return m;
+    }
+    function updateSquadCards(){if(!squads.length)return;saveSquad();for(let i=0;i<4;i++){const q=squads[i],b=$('sq'+i);b.textContent=(i+1)+' · '+profiles[i].name+' | '+q.planeCount+'/3 | '+(q.docked?(q.rearmTimer>0?'REARME':'CONVÉS'):q.returning?'RETORNO':'VOO')+' | '+q.rounds+' salvas';b.style.borderColor=i===activeSquad?'#65d3c6':'#45616b';}}
     function setWeapon(weapon) {
+      if(game.battleActive){selectSquad(['rockets','torpedoes','bombs'].indexOf(weapon));return;}
       if (!weapons[weapon]) return;
       if(game.battleActive && !game.docked && weapon!==selectedLoadout){showToast('Troque o tipo de esquadrão no convés.','warn');return;}
       selectedLoadout=weapon;
@@ -1653,7 +1670,7 @@
       const angle = Math.acos(alignment);
       const inRange = distance >= definition.minRange && distance <= definition.maxRange;
       const aligned = angle <= definition.cone;
-      const hit = inRange && aligned;
+      const hit = inRange && aligned && (activeSquad!==3 || distance<=100);
 
       let reason = 'alinhamento insuficiente';
       if (!inRange) reason = distance < definition.minRange ? 'alvo próximo demais' : 'alvo fora de alcance';
@@ -1668,7 +1685,7 @@
       const quality = Math.max(.62, 1 - (angle / definition.cone) * .28);
       const tierBonus = 1 + (ship.tier - 4) * .035;
       const damage = hit
-        ? Math.round(definition.damage * nation.modifiers[weapon] * tierBonus * quality * (game.planeCount / 3))
+        ? Math.round(definition.damage * (activeSquad===3?.65:1) * nation.modifiers[weapon] * tierBonus * quality * (game.planeCount / 3))
         : 0;
 
       const numberOfShots = weapon === 'rockets' ? 6 : 3;
@@ -1874,7 +1891,7 @@
           showToast(`Fogo antiaéreo: uma aeronave perdida. ${game.planeCount} restantes.`, 'danger');
         } else {
           game.planeCount=0; game.airHealth=0; game.docked=true; game.returning=false; game.rearmTimer=6; commandMode=true; game.planePos.copy(game.carrierPos); game.planePos.y=6;
-          showToast('Esquadrão perdido. Prepare outro no convés.', 'danger'); if(reserve===0)finishBattle(false);
+          showToast('Esquadrão perdido. Prepare outro no convés.', 'danger'); if(reserve===0 && squads.every((q,i)=>i===activeSquad || (q.planeCount===0&&q.reserve===0)))finishBattle(false);
         }
       }
     }
@@ -1888,9 +1905,9 @@
         game.docked = false;
         game.returning = false;
         game.planePos.set(game.carrierPos.x, 32, game.carrierPos.z - 36);
-        game.altitude = 32;
+        game.altitude = profiles[activeSquad].alt; game.planePos.y=game.altitude;
         game.yaw = 0;
-        game.speed = 25 * nations[game.nation].modifiers.speed;
+        game.speed = profiles[activeSquad].speed * nations[game.nation].modifiers.speed;
         game.airHealth = 100;
         game.cooldown = 0;
         updateFormation();
@@ -1934,25 +1951,25 @@
       while (deltaYaw < -Math.PI) deltaYaw += Math.PI * 2;
 
       game.yaw += deltaYaw * Math.min(1, dt * 1.7);
-      game.speed = 42 * nations[game.nation].modifiers.speed;
+      game.speed = profiles[activeSquad].max * nations[game.nation].modifiers.speed;
       game.planePos.addScaledVector(setForwardVector(), game.speed * dt);
     }
 
     function updateManualFlight(dt) {
       const keys = game.keys;
       const turnInput = (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0);
-      game.yaw += turnInput * 0.78 * dt;
+      const profile=profiles[activeSquad]; game.yaw += turnInput * profile.turn * dt;
 
-      let desiredSpeed = 29 * nations[game.nation].modifiers.speed;
-      if (keys.KeyW) desiredSpeed = 48 * nations[game.nation].modifiers.speed;
-      if (keys.KeyS) desiredSpeed = 13 * nations[game.nation].modifiers.speed;
+      let desiredSpeed = profile.speed * nations[game.nation].modifiers.speed;
+      if (keys.KeyW) desiredSpeed = profile.max * nations[game.nation].modifiers.speed;
+      if (keys.KeyS) desiredSpeed = profile.min * nations[game.nation].modifiers.speed;
       if (keys.ShiftLeft || keys.ShiftRight) desiredSpeed *= 1.22;
 
       game.speed += (desiredSpeed - game.speed) * Math.min(1, dt * 1.4);
 
-      if (keys.KeyE) game.altitude += 15 * dt;
-      if (keys.KeyQ) game.altitude -= 15 * dt;
-      game.altitude = clamp(game.altitude, 12, 72);
+      if (keys.KeyE || keys.KeyC) game.altitude += 15 * dt;
+      if (keys.KeyQ || keys.KeyX) game.altitude -= 15 * dt;
+      game.altitude = clamp(game.altitude, activeSquad===3?4:12, activeSquad===3?52:72);
       game.planePos.y = game.altitude;
 
       game.planePos.addScaledVector(setForwardVector(), game.speed * dt);
@@ -1979,11 +1996,14 @@
         } else if (game.returning) {
           updateReturnFlight(dt);
         } else {
-          updateManualFlight(dt);
+          if(commandMode){game.yaw+=.24*dt;game.planePos.addScaledVector(setForwardVector(),profiles[activeSquad].speed*dt);}else updateManualFlight(dt);
         }
 
         updateFormation();
         applyAntiAircraft(dt);
+        const chosen=activeSquad; const mode=commandMode;saveSquad();
+        for(let i=0;i<squads.length;i++){if(i===chosen)continue;loadSquad(i);game.cooldown=Math.max(0,game.cooldown-dt);if(game.docked){game.rearmTimer=Math.max(0,game.rearmTimer-dt);if(game.rearmTimer===0){const n=Math.min(3-game.planeCount,reserve);game.planeCount+=n;reserve-=n;if(game.planeCount)game.airHealth=100;rounds=profiles[i].ammo;}game.planePos.copy(game.carrierPos).add(new THREE.Vector3(-4+i*2,3,i*6));}else if(game.returning){updateReturnFlight(dt);}else{game.yaw+=.24*dt;game.planePos.addScaledVector(setForwardVector(),profiles[i].speed*dt);}updateFormation();applyAntiAircraft(dt);saveSquad();}
+        loadSquad(chosen);commandMode=mode;updateSquadCards();
       }
 
       updateProjectiles(dt);
@@ -1991,11 +2011,11 @@
       updateTracers(dt);
       updateBattleHUD(); drawRadar();
     }
-    function drawRadar(){const c=$('radar'),ctx=c.getContext('2d');ctx.clearRect(0,0,200,160);ctx.strokeStyle='#345763';for(let i=0;i<200;i+=20){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,160);ctx.stroke();}for(let i=0;i<160;i+=20){ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(200,i);ctx.stroke();}for(const [p,col] of [[game.carrierPos,'#65d3c6'],[game.enemyPos,'#f17a72'],[game.planePos,'#e8bd78'],...(destination?[[destination,'#ffffff']]:[])]){ctx.fillStyle=col;ctx.fillRect(100+p.x/5-3,80+p.z/5-3,6,6);} $('commandStatus').textContent=`Casco: ${Math.round(carrierHp)} / ${carrierMax} · Reserva: ${reserve} · Salvas: ${rounds} · Altitude: ${Math.round(game.altitude)} · ${commandMode?'COMANDO':'VOO'}`;}
+    function drawRadar(){const c=$('radar'),ctx=c.getContext('2d');ctx.clearRect(0,0,200,160);ctx.strokeStyle='#345763';for(let i=0;i<200;i+=20){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,160);ctx.stroke();}for(let i=0;i<160;i+=20){ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(200,i);ctx.stroke();}for(const [p,col] of [[game.carrierPos,'#65d3c6'],[game.enemyPos,'#f17a72'],[game.planePos,'#e8bd78'],...squads.filter((q,i)=>i!==activeSquad&&!q.docked).map(q=>[q.planePos,'#78aaff']),...(destination?[[destination,'#ffffff']]:[])]){ctx.fillStyle=col;ctx.fillRect(100+p.x/5-3,80+p.z/5-3,6,6);} $('commandStatus').textContent=`Casco: ${Math.round(carrierHp)} / ${carrierMax} · ${profiles[activeSquad].name} · Reserva: ${reserve} · Salvas: ${rounds} · Altitude: ${Math.round(game.altitude)} · ${commandMode?'COMANDO':'VOO'}`;}
     $('radar').onclick=e=>{const b=e.currentTarget.getBoundingClientRect();destination=new THREE.Vector3(((e.clientX-b.left)/b.width*200-100)*5,0,((e.clientY-b.top)/b.height*160-80)*5);};
-    function toggleCommand(){commandMode=!commandMode;if(commandMode&&!game.docked)game.returning=true;}
+    function toggleCommand(){commandMode=!commandMode;game.keys={};}
     function togglePause(){paused=!paused;$('pauseBtn').textContent=paused?'P · Continuar':'P · Pausar';game.keys={};}
-    $('modeBtn').onclick=toggleCommand;$('viewBtn').onclick=()=>cameraMode=(cameraMode+1)%3;$('pauseBtn').onclick=togglePause;$('abortBtn').onclick=()=>finishBattle(false);
+    for(let i=0;i<4;i++)$('sq'+i).onclick=()=>selectSquad(i); $('modeBtn').onclick=toggleCommand;$('viewBtn').onclick=()=>cameraMode=(cameraMode+1)%3;$('pauseBtn').onclick=togglePause;$('abortBtn').onclick=()=>finishBattle(false);
 
 
     function updateBattleHUD(force = false) {
@@ -2077,7 +2097,7 @@
       $('resultModal').classList.add('hidden');
       setupBattle();
       showScreen('battle');
-      showToast(`${nations[game.nation].name} · esquadrão de três aeronaves lançado.`);
+      showToast(`${nations[game.nation].name} · ala aérea de 12 aeronaves disponível.`);
     }
 
     // ---------- Navegação e interface ----------
@@ -2162,6 +2182,7 @@
       if (event.code === 'Digit1') setWeapon('rockets');
       if (event.code === 'Digit2') setWeapon('torpedoes');
       if (event.code === 'Digit3') setWeapon('bombs');
+      if (event.code === 'Digit4') selectSquad(3);
     });
 
     document.addEventListener('keyup', (event) => {
