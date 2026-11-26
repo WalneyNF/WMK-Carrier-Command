@@ -18,3 +18,8 @@ Próximas etapas: múltiplos navios, esquadrões simultâneos, decolagem e pouso
 Projeto distribuído sob a [licença MIT](LICENSE). O Three.js possui sua própria licença MIT.
 
 O jogo é um projeto independente, sem afiliação com World of Warships ou Wargaming.
+
+
+## v0.3.0 — Aviação embarcada independente
+
+Quatro esquadrões de três aeronaves: 1 Falcão (foguetes), 2 Tubarão (torpedos), 3 Águia (bombas), 4 Tritão (helicópteros). Selecione pelo teclado ou centro de comando. Selecionar um esquadrão pronto no convés lança-o; R retorna ou lança. W/S altera velocidade, A/D curva, E/Q ou C/X altitude. No helicóptero, mantenha S para reduzir a velocidade até pairar. Esquadrões não selecionados voam em círculos ou retornam automaticamente se previamente ordenado. Cada grupo possui munição, reservas, integridade e recarga próprias. Modelos procedurais e lançamento simplificado; pouso animado, combate aéreo e missões de resgate são futuros. Versão ainda não validada em navegador.
