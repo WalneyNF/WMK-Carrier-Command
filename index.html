@@ -1,0 +1,2253 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WMK Carrier Command v0.2.0</title>
+  <style>
+    :root {
+      --ink: #e9f3f3;
+      --muted: #9db4b7;
+      --deep: #07151d;
+      --panel: rgba(8, 22, 30, .82);
+      --line: rgba(193, 226, 225, .16);
+      --teal: #65d3c6;
+      --gold: #e8bd78;
+      --red: #f17a72;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #102934;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    button, select { font: inherit; }
+    button { color: inherit; }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    #stage canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .screen-shade {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        linear-gradient(90deg, rgba(4, 15, 22, .58), transparent 64%),
+        linear-gradient(0deg, rgba(4, 13, 18, .32), transparent 48%);
+    }
+
+    .topbar {
+      position: fixed;
+      z-index: 10;
+      inset: 0 0 auto;
+      height: 76px;
+      display: flex;
+      align-items: center;
+      gap: 36px;
+      padding: 0 34px;
+      background: linear-gradient(180deg, rgba(5, 17, 24, .94), rgba(5, 17, 24, .56));
+      border-bottom: 1px solid rgba(209, 235, 231, .13);
+      backdrop-filter: blur(15px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 235px;
+      letter-spacing: .14em;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 35px;
+      height: 35px;
+      border: 1px solid var(--teal);
+      color: var(--teal);
+      transform: rotate(45deg);
+      font-size: 17px;
+    }
+
+    .brand-mark span { transform: rotate(-45deg); }
+    .brand small { display: block; color: var(--muted); font-size: 9px; letter-spacing: .25em; margin-top: 3px; }
+    .brand strong { display: block; }
+
+    .main-nav { display: flex; align-items: center; gap: 8px; height: 100%; }
+
+    .nav-btn {
+      height: 100%;
+      padding: 0 17px;
+      position: relative;
+      color: #a7babc;
+      background: none;
+      border: 0;
+      letter-spacing: .13em;
+      font-weight: 750;
+      font-size: 10px;
+      cursor: pointer;
+      transition: color .2s;
+    }
+
+    .nav-btn:hover, .nav-btn.active { color: white; }
+    .nav-btn.active::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 17px;
+      right: 17px;
+      height: 2px;
+      background: var(--teal);
+      box-shadow: 0 0 14px rgba(101, 211, 198, .6);
+    }
+
+    .top-spacer { flex: 1; }
+
+    .top-meta {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: .13em;
+    }
+
+    .xp-chip {
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      padding: 9px 12px;
+      background: rgba(9, 27, 35, .6);
+    }
+
+    .xp-chip b { color: var(--gold); margin-left: 8px; }
+
+    .icon-button {
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--line);
+      background: rgba(8, 24, 31, .65);
+      cursor: pointer;
+      color: var(--muted);
+    }
+
+    .icon-button:hover { color: white; border-color: var(--teal); }
+
+    .screen {
+      display: none;
+      position: fixed;
+      z-index: 4;
+      inset: 76px 0 0;
+      pointer-events: none;
+    }
+
+    .screen.active { display: block; }
+
+    .glass {
+      background: linear-gradient(145deg, rgba(9, 25, 33, .93), rgba(8, 21, 28, .78));
+      border: 1px solid var(--line);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .25);
+      backdrop-filter: blur(14px);
+    }
+
+    .port-panel {
+      position: absolute;
+      top: 34px;
+      left: 34px;
+      bottom: 34px;
+      width: min(430px, calc(100vw - 50px));
+      padding: 32px;
+      pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .eyebrow {
+      color: var(--teal);
+      font-size: 9px;
+      letter-spacing: .23em;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .eyebrow .dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--teal);
+      margin-right: 8px;
+      box-shadow: 0 0 10px var(--teal);
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    .port-panel h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(37px, 4.2vw, 54px);
+      line-height: .96;
+      letter-spacing: -.06em;
+      font-weight: 780;
+    }
+
+    .port-panel h1 em {
+      color: var(--teal);
+      font-style: normal;
+    }
+
+    .lead {
+      color: #a8babc;
+      max-width: 330px;
+      font-size: 13px;
+      line-height: 1.7;
+      margin-bottom: 26px;
+    }
+
+    .field-label {
+      display: block;
+      color: #8ba2a5;
+      font-size: 9px;
+      letter-spacing: .18em;
+      margin: 0 0 8px;
+      text-transform: uppercase;
+    }
+
+    select {
+      width: 100%;
+      padding: 12px 14px;
+      color: var(--ink);
+      background: rgba(1, 11, 16, .55);
+      border: 1px solid rgba(198, 226, 224, .2);
+      border-radius: 1px;
+      outline: none;
+    }
+
+    select:focus { border-color: var(--teal); }
+
+    .carrier-card {
+      margin-top: 16px;
+      padding: 18px;
+      border: 1px solid rgba(191, 220, 216, .14);
+      background: rgba(255, 255, 255, .025);
+    }
+
+    .ship-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--teal);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    .carrier-card h2 {
+      margin: 11px 0 5px;
+      font-size: 21px;
+      letter-spacing: -.02em;
+    }
+
+    .carrier-card p {
+      min-height: 38px;
+      color: #9eb2b4;
+      font-size: 11px;
+      line-height: 1.6;
+      margin-bottom: 14px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      border-top: 1px solid var(--line);
+      padding-top: 13px;
+      gap: 8px;
+    }
+
+    .stat small {
+      display: block;
+      color: #81999c;
+      font-size: 8px;
+      letter-spacing: .14em;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+
+    .stat b { font-size: 13px; }
+
+    .primary-button, .secondary-button {
+      min-height: 48px;
+      padding: 0 18px;
+      border: 1px solid var(--teal);
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 850;
+      letter-spacing: .16em;
+      transition: .2s;
+    }
+
+    .primary-button {
+      color: #051719;
+      background: var(--teal);
+      box-shadow: 0 0 26px rgba(101, 211, 198, .12);
+    }
+
+    .primary-button:hover {
+      background: #91eee0;
+      box-shadow: 0 0 30px rgba(101, 211, 198, .3);
+      transform: translateY(-1px);
+    }
+
+    .secondary-button {
+      color: var(--teal);
+      background: rgba(28, 74, 78, .18);
+    }
+
+    .secondary-button:hover { background: rgba(57, 133, 132, .28); }
+
+    .launch-button { width: 100%; margin-top: 20px; }
+
+    .port-footnote {
+      color: #81989a;
+      margin-top: auto;
+      padding-top: 22px;
+      font-size: 9px;
+      letter-spacing: .1em;
+      line-height: 1.7;
+    }
+
+    .port-footnote span { color: var(--gold); }
+
+    .port-caption {
+      position: absolute;
+      right: 34px;
+      bottom: 28px;
+      color: rgba(231, 244, 240, .78);
+      font-size: 9px;
+      letter-spacing: .2em;
+      text-align: right;
+      text-shadow: 0 2px 8px #07151d;
+    }
+
+    .port-caption b { display: block; color: white; font-size: 13px; margin-bottom: 6px; }
+
+    .tech-wrap {
+      position: absolute;
+      inset: 28px 32px 28px;
+      pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tech-header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 20px 24px;
+      margin-bottom: 14px;
+    }
+
+    .tech-header h1 { margin: 8px 0 0; font-size: 28px; letter-spacing: -.04em; }
+    .tech-header p { color: var(--muted); margin: 6px 0 0; font-size: 11px; }
+
+    .tree-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(205px, 1fr));
+      gap: 12px;
+      overflow: auto;
+      padding: 2px 2px 14px;
+    }
+
+    .nation-column {
+      padding: 16px;
+      border: 1px solid var(--line);
+      background: rgba(6, 19, 26, .8);
+      min-width: 0;
+    }
+
+    .nation-heading {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 12px;
+    }
+
+    .nation-emblem {
+      display: grid;
+      place-items: center;
+      width: 29px;
+      height: 29px;
+      border: 1px solid var(--nation-color, var(--teal));
+      color: var(--nation-color, var(--teal));
+      font-weight: 850;
+      font-size: 10px;
+    }
+
+    .nation-heading strong { display: block; font-size: 11px; }
+    .nation-heading small { display: block; color: #8ca3a5; margin-top: 4px; font-size: 9px; }
+
+    .tech-node {
+      width: 100%;
+      position: relative;
+      text-align: left;
+      padding: 13px;
+      margin-bottom: 10px;
+      color: var(--ink);
+      background: rgba(255, 255, 255, .025);
+      border: 1px solid rgba(194, 220, 218, .15);
+      cursor: pointer;
+      transition: .18s;
+    }
+
+    .tech-node:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      bottom: -11px;
+      left: 22px;
+      width: 1px;
+      height: 10px;
+      background: rgba(101, 211, 198, .45);
+    }
+
+    .tech-node:hover { border-color: var(--teal); transform: translateY(-1px); }
+    .tech-node.selected { border-color: var(--teal); background: rgba(56, 137, 131, .16); }
+    .tech-node.locked { opacity: .7; }
+    .tech-node.locked:hover { border-color: var(--gold); }
+
+    .node-top { display: flex; justify-content: space-between; align-items: center; }
+    .node-top b { font-size: 10px; letter-spacing: .13em; color: var(--teal); }
+    .node-top span { font-size: 9px; color: var(--gold); }
+    .tech-node strong { display: block; margin: 9px 0 5px; font-size: 13px; }
+    .tech-node small { display: block; min-height: 30px; color: #91a8aa; font-size: 9px; line-height: 1.5; }
+    .node-action { display: block; margin-top: 10px; color: #8fa8aa; font-size: 8px; letter-spacing: .12em; font-weight: 800; }
+    .tech-node.selected .node-action { color: var(--teal); }
+    .tech-node.locked .node-action { color: var(--gold); }
+
+    .hidden { display: none !important; }
+
+    #battleUI {
+      position: fixed;
+      inset: 0;
+      z-index: 8;
+      pointer-events: none;
+    }
+
+    .battle-top {
+      position: absolute;
+      inset: 0 0 auto;
+      min-height: 80px;
+      display: flex;
+      align-items: center;
+      gap: 25px;
+      padding: 15px 25px;
+      background: linear-gradient(180deg, rgba(3, 14, 20, .91), rgba(3, 14, 20, .23));
+    }
+
+    .battle-brand {
+      padding-right: 22px;
+      border-right: 1px solid var(--line);
+      font-size: 10px;
+      font-weight: 850;
+      letter-spacing: .16em;
+    }
+
+    .battle-brand span { color: var(--teal); }
+    .mission-label { color: var(--gold); font-size: 8px; letter-spacing: .2em; }
+    .mission-title { margin-top: 5px; font-size: 12px; font-weight: 750; letter-spacing: .06em; }
+
+    .target-widget {
+      width: min(320px, 33vw);
+      margin-left: auto;
+      padding: 11px 14px;
+      border: 1px solid rgba(234, 245, 239, .14);
+      background: rgba(5, 18, 25, .68);
+    }
+
+    .target-line { display: flex; align-items: center; justify-content: space-between; font-size: 10px; }
+    .target-line small { color: var(--red); font-size: 8px; letter-spacing: .15em; }
+    .bar {
+      position: relative;
+      overflow: hidden;
+      height: 5px;
+      margin: 8px 0 5px;
+      background: rgba(255, 255, 255, .13);
+    }
+
+    .bar i { display: block; width: 100%; height: 100%; background: var(--teal); transition: width .2s; }
+    .bar.enemy i { background: var(--red); }
+    .target-widget .hp-text { color: #a5b9ba; font-size: 8px; letter-spacing: .1em; }
+
+    .reticle {
+      position: absolute;
+      top: 48%;
+      left: 50%;
+      width: 42px;
+      height: 42px;
+      transform: translate(-50%, -50%);
+      opacity: .72;
+    }
+
+    .reticle::before, .reticle::after {
+      content: "";
+      position: absolute;
+      background: rgba(226, 249, 241, .86);
+      box-shadow: 0 0 8px rgba(101, 211, 198, .7);
+    }
+
+    .reticle::before { left: 20px; top: 0; width: 1px; height: 42px; }
+    .reticle::after { left: 0; top: 20px; width: 42px; height: 1px; }
+    .reticle span {
+      position: absolute;
+      left: 16px;
+      top: 16px;
+      width: 9px;
+      height: 9px;
+      border: 1px solid var(--teal);
+      border-radius: 50%;
+    }
+
+    .flight-panel {
+      position: absolute;
+      left: 24px;
+      bottom: 24px;
+      width: 235px;
+      padding: 15px;
+      background: rgba(5, 18, 25, .8);
+      border: 1px solid rgba(220, 239, 232, .16);
+      backdrop-filter: blur(10px);
+    }
+
+    .panel-overline { color: var(--teal); font-size: 8px; letter-spacing: .19em; font-weight: 850; }
+    .flight-count { display: flex; align-items: baseline; justify-content: space-between; margin-top: 9px; }
+    .flight-count strong { font-size: 24px; letter-spacing: -.04em; }
+    .flight-count small { color: #95aaab; font-size: 8px; letter-spacing: .14em; }
+    .flight-panel .bar { height: 4px; margin: 10px 0 9px; }
+    .flight-info { display: flex; justify-content: space-between; color: #9bb0b1; font-size: 8px; letter-spacing: .1em; }
+    .flight-status { color: var(--gold); font-size: 8px; margin-top: 11px; letter-spacing: .12em; }
+
+    .weapon-deck {
+      position: absolute;
+      left: 50%;
+      bottom: 24px;
+      width: min(480px, calc(100vw - 550px));
+      min-width: 350px;
+      transform: translateX(-50%);
+      pointer-events: auto;
+      padding: 12px;
+      background: rgba(5, 18, 25, .85);
+      border: 1px solid rgba(220, 239, 232, .16);
+      backdrop-filter: blur(10px);
+    }
+
+    .weapon-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+
+    .weapon-btn {
+      position: relative;
+      min-height: 56px;
+      text-align: left;
+      padding: 8px 10px;
+      border: 1px solid rgba(210, 233, 226, .14);
+      background: rgba(255, 255, 255, .025);
+      cursor: pointer;
+      transition: .15s;
+    }
+
+    .weapon-btn:hover, .weapon-btn.active { border-color: var(--teal); background: rgba(64, 151, 143, .13); }
+    .weapon-btn b { display: block; font-size: 9px; letter-spacing: .12em; }
+    .weapon-btn small { display: block; margin-top: 6px; color: #91a8aa; font-size: 8px; }
+    .weapon-key { position: absolute; right: 8px; top: 7px; color: var(--gold); font-size: 8px; }
+
+    .attack-row { display: flex; gap: 8px; margin-top: 9px; }
+    .attack-button {
+      flex: 1;
+      min-height: 39px;
+      color: #051719;
+      border: 1px solid var(--teal);
+      background: var(--teal);
+      cursor: pointer;
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: .16em;
+    }
+
+    .attack-button:hover:not(:disabled) { background: #9af1e2; }
+    .attack-button:disabled { opacity: .42; cursor: not-allowed; }
+    .cooldown-readout {
+      min-width: 92px;
+      display: grid;
+      place-items: center;
+      color: var(--gold);
+      border: 1px solid var(--line);
+      font-size: 8px;
+      letter-spacing: .12em;
+    }
+
+    .control-hint {
+      position: absolute;
+      right: 24px;
+      bottom: 25px;
+      width: 188px;
+      color: #b0c2c1;
+      font-size: 8px;
+      line-height: 1.8;
+      letter-spacing: .07em;
+      text-align: right;
+      text-shadow: 0 2px 6px #06151b;
+    }
+
+    .control-hint b { color: white; font-weight: 800; }
+
+    .rtb-button {
+      position: absolute;
+      left: 24px;
+      bottom: 163px;
+      width: 235px;
+      min-height: 36px;
+      pointer-events: auto;
+      color: var(--gold);
+      border: 1px solid rgba(232, 189, 120, .42);
+      background: rgba(47, 38, 25, .56);
+      cursor: pointer;
+      font-size: 8px;
+      font-weight: 850;
+      letter-spacing: .14em;
+    }
+
+    .rtb-button:hover { background: rgba(105, 78, 38, .55); }
+
+    .distance-readout {
+      position: absolute;
+      top: 96px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #d7e6e2;
+      text-shadow: 0 2px 7px #06151b;
+      font-size: 8px;
+      letter-spacing: .16em;
+    }
+
+    .toast {
+      position: fixed;
+      z-index: 30;
+      top: 100px;
+      left: 50%;
+      transform: translate(-50%, -12px);
+      padding: 12px 18px;
+      color: #e8f5f1;
+      background: rgba(6, 21, 28, .92);
+      border: 1px solid rgba(101, 211, 198, .45);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, .3);
+      opacity: 0;
+      pointer-events: none;
+      transition: .22s;
+      font-size: 10px;
+      letter-spacing: .08em;
+    }
+
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .toast.warn { border-color: rgba(232, 189, 120, .65); }
+    .toast.danger { border-color: rgba(241, 122, 114, .7); }
+
+    .modal {
+      position: fixed;
+      z-index: 25;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: rgba(2, 10, 14, .63);
+      backdrop-filter: blur(7px);
+    }
+
+    .modal-card {
+      width: min(450px, calc(100vw - 36px));
+      padding: 34px;
+      text-align: center;
+    }
+
+    .modal-card h2 { margin: 12px 0; font-size: 35px; letter-spacing: -.05em; }
+    .modal-card p { color: #a5b9ba; font-size: 12px; line-height: 1.7; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 22px; }
+    .modal-actions button { flex: 1; }
+
+    body.in-battle .topbar { display: none; }
+    body.in-battle .screen { display: none !important; }
+
+    @media (max-width: 900px) {
+      .tree-grid { grid-template-columns: repeat(2, minmax(200px, 1fr)); }
+      .brand { min-width: auto; }
+      .topbar { gap: 12px; padding: 0 16px; }
+      .port-panel { left: 18px; top: 18px; bottom: 18px; padding: 24px; }
+      .weapon-deck { left: 50%; min-width: 320px; width: 340px; bottom: 18px; }
+      .flight-panel { left: 14px; bottom: 18px; width: 190px; }
+      .rtb-button { left: 14px; bottom: 157px; width: 190px; }
+      .control-hint { display: none; }
+    }
+
+    @media (max-width: 620px) {
+      .topbar { height: 64px; }
+      .brand small, .top-meta .xp-chip { display: none; }
+      .brand { font-size: 9px; gap: 8px; }
+      .brand-mark { width: 29px; height: 29px; }
+      .nav-btn { padding: 0 8px; font-size: 8px; letter-spacing: .07em; }
+      .nav-btn.active::after { left: 8px; right: 8px; }
+      .screen { inset-top: 64px; }
+      .screen { inset: 64px 0 0; }
+      .port-panel { width: calc(100vw - 30px); left: 15px; top: 12px; bottom: 12px; padding: 22px; }
+      .port-panel h1 { font-size: 39px; margin-top: 15px; }
+      .port-caption { display: none; }
+      .tech-wrap { inset: 12px; }
+      .tech-header { align-items: flex-start; padding: 15px; }
+      .tech-header h1 { font-size: 21px; }
+      .tree-grid { grid-template-columns: 1fr; }
+      .target-widget { width: 42vw; }
+      .battle-brand { display: none; }
+      .mission-title { font-size: 10px; }
+      .flight-panel { width: 150px; padding: 10px; bottom: 12px; left: 10px; }
+      .flight-count strong { font-size: 19px; }
+      .rtb-button { width: 150px; left: 10px; bottom: 144px; }
+      .weapon-deck { left: auto; right: 10px; bottom: 12px; transform: none; width: min(300px, calc(100vw - 175px)); min-width: 0; padding: 8px; }
+      .weapon-btn { min-height: 48px; padding: 7px; }
+      .weapon-btn b { font-size: 7px; }
+      .weapon-btn small { font-size: 7px; }
+      .attack-button { min-height: 34px; font-size: 8px; }
+      .cooldown-readout { min-width: 72px; }
+      .distance-readout { top: 88px; }
+    }
+  
+#command {position:absolute;right:18px;top:145px;width:230px;padding:12px;pointer-events:auto;font-size:11px;max-height:55vh;overflow:auto} #command button {background:#173843;border:1px solid #65d3c6;color:white;padding:7px;cursor:pointer;margin:3px 0;width:100%} #command canvas {width:100%;background:#102c39;cursor:crosshair} #command p{margin:7px 0} .port-panel{overflow:auto} .port-footnote{margin-top:10px} 
+</style>
+<link rel="icon" href="assets/logo.svg">
+</head>
+<body>
+  <div id="stage"></div>
+  <div class="screen-shade"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark"><span>✦</span></div>
+      <div><strong>WMK CARRIER COMMAND</strong><small>AVIAÇÃO NAVAL</small></div>
+    </div>
+
+    <nav class="main-nav">
+      <button class="nav-btn active" data-nav="port">PORTO</button>
+      <button class="nav-btn" data-nav="tech">ÁRVORE TECNOLÓGICA</button>
+    </nav>
+
+    <div class="top-spacer"></div>
+
+    <div class="top-meta">
+      <div class="xp-chip">EXPERIÊNCIA <b id="xpValue">0</b></div>
+      <button id="fullscreenBtn" class="icon-button" title="Tela cheia" aria-label="Tela cheia">⛶</button>
+    </div>
+  </header>
+
+  <section id="portScreen" class="screen active">
+    <article class="port-panel glass">
+      <div class="eyebrow"><span class="dot"></span> BASE NAVAL · PRONTIDÃO</div>
+      <h1>Domine o<br><em>mar aberto.</em></h1>
+      <p class="lead">Comande um porta-aviões, planeje suas surtidas e escolha o momento certo para atacar.</p>
+
+      <label class="field-label" for="nationSelect">Nação</label>
+      <select id="nationSelect"></select>
+
+      <div class="carrier-card">
+        <div class="ship-meta">
+          <span id="shipTier">PORTA-AVIÕES · TIER IV</span>
+          <span>EM SERVIÇO</span>
+        </div>
+        <h2 id="shipName">CV-04 Liberty</h2>
+        <p id="shipDescription"></p>
+        <div class="stat-grid">
+          <div class="stat"><small>Casco</small><b id="shipHp">—</b></div>
+          <div class="stat"><small>Velocidade</small><b id="shipSpeed">—</b></div>
+          <div class="stat"><small>Esquadrão</small><b>3 aeronaves</b></div>
+        </div>
+      </div>
+
+      <label class="field-label" for="missionSelect">Operação</label><select id="missionSelect"><option value="0">Academia — alvo de treinamento</option><option value="1">Mar aberto — patrulha inimiga</option><option value="2">Defesa da frota — pressão naval</option></select><button id="startBattleBtn" class="primary-button launch-button">INICIAR OPERAÇÃO <span>↗</span></button>
+
+      <div class="port-footnote">
+        DOUTRINA NACIONAL<br>
+        <span id="doctrineText"></span><br><br>
+        v0.2.0 · Walney Moreira Klein — walneyk@hotmail.com<br>Progresso salvo neste navegador.
+      </div>
+    </article>
+
+    <div class="port-caption">
+      <b>ARSENAL NAVAL · SETOR DO ATLÂNTICO</b>
+      PORTO DE OPERAÇÕES / PRONTIDÃO DE COMBATE
+    </div>
+  </section>
+
+  <section id="techScreen" class="screen">
+    <div class="tech-wrap">
+      <div class="tech-header glass">
+        <div>
+          <div class="eyebrow">PROGRESSÃO DE FROTA</div>
+          <h1>Árvore tecnológica</h1>
+          <p>Pesquise novos porta-aviões com a experiência obtida em combate.</p>
+        </div>
+        <div class="xp-chip">EXPERIÊNCIA <b id="techXpValue">0</b></div>
+      </div>
+      <div id="treeGrid" class="tree-grid"></div>
+    </div>
+  </section>
+
+  <div id="battleUI" class="hidden">
+    <div class="battle-top">
+      <div class="battle-brand">MARÉ <span>DE AÇO</span></div>
+      <div>
+        <div class="mission-label">OPERAÇÃO · MAR ABERTO</div>
+        <div class="mission-title">ATAQUE AO GRUPO DE SUPERFÍCIE</div>
+      </div>
+
+      <div class="target-widget">
+        <div class="target-line">
+          <b>CRUZADOR INIMIGO</b>
+          <small>ALVO HOSTIL</small>
+        </div>
+        <div class="bar enemy"><i id="enemyHpBar"></i></div>
+        <div class="hp-text" id="enemyHpText">—</div>
+      </div>
+    </div>
+
+    <div id="distanceReadout" class="distance-readout">DISTÂNCIA — · ALINHAMENTO —</div>
+
+    <div class="reticle"><span></span></div>
+
+    <div class="flight-panel">
+      <div class="panel-overline">ESQUADRÃO DE ATAQUE</div>
+      <div class="flight-count">
+        <strong id="planeCount">03 / 03</strong>
+        <small id="speedReadout">— NÓS</small>
+      </div>
+      <div class="bar"><i id="airHealthBar"></i></div>
+      <div class="flight-info"><span>INTEGRIDADE</span><b id="airHealthText">100%</b></div>
+      <div id="flightStatus" class="flight-status">EM VOO</div>
+    </div>
+
+    <button id="rtbBtn" class="rtb-button">RETORNAR AO PORTA-AVIÕES · R</button>
+
+    <div class="weapon-deck">
+      <div class="weapon-list">
+        <button class="weapon-btn active" data-weapon="rockets">
+          <span class="weapon-key">1</span><b>FOGUETES</b><small>Rápido · médio alcance</small>
+        </button>
+        <button class="weapon-btn" data-weapon="torpedoes">
+          <span class="weapon-key">2</span><b>TORPEDOS</b><small>Potente · baixa altitude</small>
+        </button>
+        <button class="weapon-btn" data-weapon="bombs">
+          <span class="weapon-key">3</span><b>BOMBAS</b><small>Precisão · ataque em mergulho</small>
+        </button>
+      </div>
+      <div class="attack-row">
+        <button id="attackBtn" class="attack-button">INICIAR ATAQUE · ESPAÇO</button>
+        <div id="cooldownReadout" class="cooldown-readout">PRONTO</div>
+      </div>
+    </div>
+
+    <aside id="command" class="glass"><div class="panel-overline">CENTRO DE COMANDO · M MAPA</div><canvas id="radar" width="200" height="160"></canvas><p id="commandStatus"></p><button id="modeBtn">TAB · Alternar comando / voo</button><button id="viewBtn">V · Alternar câmera</button><button id="pauseBtn">P · Pausar</button><p>1 foguetes · 2 torpedos · 3 bombas (no convés)<br>R retorna / lança · clique no mapa para mover o porta-aviões.</p><button id="abortBtn">Encerrar operação</button></aside><div class="control-hint">
+      <b>W / S</b> velocidade &nbsp; <b>A / D</b> curva<br>
+      <b>E / Q</b> altitude &nbsp; <b>1 / 2 / 3</b> armamento<br>
+      <b>ESPAÇO</b> atacar &nbsp; <b>R</b> retorno ao porta-aviões
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <div id="resultModal" class="modal hidden">
+    <div class="modal-card glass">
+      <div class="eyebrow">RELATÓRIO DA OPERAÇÃO</div>
+      <h2 id="resultTitle">VITÓRIA</h2>
+      <p id="resultText"></p>
+      <div class="modal-actions">
+        <button id="rematchBtn" class="primary-button">NOVA OPERAÇÃO</button>
+        <button id="returnPortBtn" class="secondary-button">VOLTAR AO PORTO</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+    const $ = (id) => document.getElementById(id);
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    const formatNumber = (value) => Math.round(value).toLocaleString('pt-BR');
+
+    const nations = {
+      us: {
+        name: 'Estados Unidos',
+        short: 'EUA',
+        emblem: 'US',
+        paint: 0x5d9eaa,
+        doctrine: 'Esquadrões versáteis e salvas de foguetes reforçadas.',
+        modifiers: { rockets: 1.22, torpedoes: 1.00, bombs: 1.00, speed: 1.00, toughness: 1.00 },
+        ships: [
+          { id: 'us-iv', tier: 4, name: 'CV-04 Liberty', cost: 0, hp: 42500, speed: 190, description: 'Porta-aviões equilibrado. Doutrina de foguetes para ataques versáteis.' },
+          { id: 'us-vi', tier: 6, name: 'CV-06 Resolute', cost: 450, hp: 51000, speed: 205, description: 'Convés ampliado, maior autonomia e esquadrões de ataque reforçados.' },
+          { id: 'us-viii', tier: 8, name: 'CV-08 Horizon', cost: 1200, hp: 59000, speed: 218, description: 'Plataforma avançada com surtidas mais resistentes e alto potencial ofensivo.' }
+        ]
+      },
+      jp: {
+        name: 'Japão',
+        short: 'JAP',
+        emblem: 'JP',
+        paint: 0x8d7c6d,
+        doctrine: 'Torpedos mais potentes e aviões velozes, porém mais vulneráveis.',
+        modifiers: { rockets: .93, torpedoes: 1.30, bombs: 1.00, speed: 1.10, toughness: .90 },
+        ships: [
+          { id: 'jp-iv', tier: 4, name: 'CV-04 Kumo', cost: 0, hp: 39000, speed: 205, description: 'Ala aérea veloz. Especialização em ataques de torpedo contra navios.' },
+          { id: 'jp-vi', tier: 6, name: 'CV-06 Raiden', cost: 450, hp: 46500, speed: 222, description: 'Surtidas de torpedo aprimoradas e boa capacidade de reposicionamento.' },
+          { id: 'jp-viii', tier: 8, name: 'CV-08 Tsukikage', cost: 1200, hp: 54000, speed: 235, description: 'Porta-aviões de longo alcance com uma poderosa doutrina de torpedos.' }
+        ]
+      },
+      uk: {
+        name: 'Reino Unido',
+        short: 'RU',
+        emblem: 'UK',
+        paint: 0x738a74,
+        doctrine: 'Aeronaves mais resistentes e ataques de bombas reforçados.',
+        modifiers: { rockets: .94, torpedoes: 1.04, bombs: 1.28, speed: .96, toughness: 1.18 },
+        ships: [
+          { id: 'uk-iv', tier: 4, name: 'CV-04 Crown', cost: 0, hp: 46000, speed: 180, description: 'Aeronaves robustas e ataques de bombas com bom poder de impacto.' },
+          { id: 'uk-vi', tier: 6, name: 'CV-06 Valiant', cost: 450, hp: 54500, speed: 193, description: 'Convés protegido e esquadrões preparados para ataques prolongados.' },
+          { id: 'uk-viii', tier: 8, name: 'CV-08 Sovereign', cost: 1200, hp: 62000, speed: 205, description: 'Ala aérea resistente, com foco em bombardeios consistentes.' }
+        ]
+      },
+      de: {
+        name: 'Alemanha',
+        short: 'ALE',
+        emblem: 'DE',
+        paint: 0x8d9699,
+        doctrine: 'Aeronaves rápidas e foguetes precisos; resistência mais limitada.',
+        modifiers: { rockets: 1.12, torpedoes: .91, bombs: .89, speed: 1.18, toughness: .92 },
+        ships: [
+          { id: 'de-iv', tier: 4, name: 'CV-04 Adler', cost: 0, hp: 40500, speed: 212, description: 'Esquadrões rápidos e foguetes de precisão para ataques de passagem.' },
+          { id: 'de-vi', tier: 6, name: 'CV-06 Falken', cost: 450, hp: 48000, speed: 229, description: 'Aeronaves velozes com boa capacidade de ataque e reposicionamento.' },
+          { id: 'de-viii', tier: 8, name: 'CV-08 Sturm', cost: 1200, hp: 55500, speed: 245, description: 'Porta-aviões avançado: velocidade elevada e ataques de precisão.' }
+        ]
+      }
+    };
+
+    function loadSave() {
+      try {
+        return JSON.parse(localStorage.getItem('mare-de-aco-save') || '{}');
+      } catch {
+        return {};
+      }
+    }
+
+    const saved = loadSave();
+    const unlockedShips = new Set([
+      'us-iv', 'jp-iv', 'uk-iv', 'de-iv',
+      ...(Array.isArray(saved.unlocked) ? saved.unlocked : [])
+    ]);
+
+    function findShip(id) {
+      for (const [nationId, nation] of Object.entries(nations)) {
+        const ship = nation.ships.find((item) => item.id === id);
+        if (ship) return { ...ship, nationId };
+      }
+      return null;
+    }
+
+    let startingNation = nations[saved.nation] ? saved.nation : 'us';
+    let startingShip = findShip(saved.ship);
+    if (!startingShip || !unlockedShips.has(startingShip.id)) {
+      startingShip = nations[startingNation].ships[0];
+    } else {
+      startingNation = startingShip.nationId;
+    }
+
+    const game = {
+      screen: 'port',
+      nation: startingNation,
+      selectedShipId: startingShip.id,
+      xp: Math.max(0, Number(saved.xp) || 0),
+
+      battleActive: false,
+      battleWon: false,
+      keys: {},
+      weapon: 'rockets',
+      cooldown: 0,
+
+      planePos: new THREE.Vector3(),
+      carrierPos: new THREE.Vector3(),
+      enemyPos: new THREE.Vector3(),
+      yaw: 0,
+      speed: 0,
+      planeCount: 3,
+      airHealth: 100,
+      altitude: 32,
+      returning: false,
+      docked: false,
+      rearmTimer: 0,
+
+      enemyHp: 0,
+      enemyMaxHp: 0,
+      damageDone: 0,
+      aaTimer: 0,
+      hudTimer: 0,
+
+      planeMeshes: [],
+      projectiles: [],
+      pendingBatches: [],
+      effects: [],
+      tracers: [],
+
+      enemyShip: null,
+      carrierShip: null
+    };
+
+    function saveProgress() {
+      try {
+        localStorage.setItem('mare-de-aco-save', JSON.stringify({
+          xp: game.xp,
+          nation: game.nation,
+          ship: game.selectedShipId,
+          unlocked: [...unlockedShips]
+        }));
+      } catch {}
+    }
+
+    function currentShip() {
+      return findShip(game.selectedShipId) || findShip('us-iv');
+    }
+
+    // ---------- Cena 3D ----------
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    $('stage').appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x8faeb7);
+    scene.fog = new THREE.Fog(0x8faeb7, 260, 1250);
+
+    const camera = new THREE.PerspectiveCamera(53, window.innerWidth / window.innerHeight, .1, 2800);
+    camera.position.set(78, 58, 105);
+
+    const hemisphere = new THREE.HemisphereLight(0xd4eff0, 0x27393c, 2.0);
+    scene.add(hemisphere);
+
+    const sun = new THREE.DirectionalLight(0xffebcb, 3.0);
+    sun.position.set(-180, 250, 120);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.camera.left = -300;
+    sun.shadow.camera.right = 300;
+    sun.shadow.camera.top = 300;
+    sun.shadow.camera.bottom = -300;
+    scene.add(sun);
+
+    const waterGeometry = new THREE.PlaneGeometry(2400, 2400, 72, 72);
+    waterGeometry.rotateX(-Math.PI / 2);
+    const waterBase = waterGeometry.attributes.position.array.slice();
+
+    const water = new THREE.Mesh(
+      waterGeometry,
+      new THREE.MeshStandardMaterial({
+        color: 0x286275,
+        roughness: .38,
+        metalness: .24,
+        flatShading: true
+      })
+    );
+    water.receiveShadow = true;
+    scene.add(water);
+
+    const portGroup = new THREE.Group();
+    const battleGroup = new THREE.Group();
+    scene.add(portGroup, battleGroup);
+    battleGroup.visible = false;
+
+    function makeMaterial(color, options = {}) {
+      return new THREE.MeshStandardMaterial({
+        color,
+        roughness: options.roughness ?? .7,
+        metalness: options.metalness ?? .12,
+        transparent: options.transparent ?? false,
+        opacity: options.opacity ?? 1,
+        side: options.side ?? THREE.FrontSide
+      });
+    }
+
+    function addBox(parent, size, color, position, options = {}) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(size[0], size[1], size[2]),
+        makeMaterial(color, options.material || {})
+      );
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.castShadow = options.castShadow !== false;
+      mesh.receiveShadow = options.receiveShadow !== false;
+      if (options.rotationY) mesh.rotation.y = options.rotationY;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function makeDeck(width, length, color, y) {
+      const shape = new THREE.Shape();
+      shape.moveTo(-width / 2, -length / 2);
+      shape.lineTo(width / 2, -length / 2);
+      shape.lineTo(width / 2, length / 2 - 4);
+      shape.lineTo(0, length / 2);
+      shape.lineTo(-width / 2, length / 2 - 4);
+      shape.closePath();
+
+      const mesh = new THREE.Mesh(
+        new THREE.ShapeGeometry(shape),
+        makeMaterial(color, { side: THREE.DoubleSide, roughness: .8 })
+      );
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.y = y;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+
+    function makeAircraft(paintColor = 0x5d9eaa) {
+      const aircraft = new THREE.Group();
+      const paint = makeMaterial(paintColor, { metalness: .34, roughness: .42 });
+      const dark = makeMaterial(0x27383d, { metalness: .2 });
+      const trim = makeMaterial(0xd8dfd9, { metalness: .35, roughness: .45 });
+      const glass = new THREE.MeshStandardMaterial({
+        color: 0x82cbd0,
+        roughness: .18,
+        metalness: .15,
+        transparent: true,
+        opacity: .78
+      });
+
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(.38, .48, 4.5, 10), paint);
+      body.rotation.x = -Math.PI / 2;
+      body.castShadow = true;
+      aircraft.add(body);
+
+      const nose = new THREE.Mesh(new THREE.ConeGeometry(.4, 1.2, 9), trim);
+      nose.rotation.x = -Math.PI / 2;
+      nose.position.z = -2.55;
+      nose.castShadow = true;
+      aircraft.add(nose);
+
+      const wings = new THREE.Mesh(new THREE.BoxGeometry(8, .18, 1.0), paint);
+      wings.position.set(0, -.02, .25);
+      wings.castShadow = true;
+      aircraft.add(wings);
+
+      const tailWings = new THREE.Mesh(new THREE.BoxGeometry(3.15, .16, .62), paint);
+      tailWings.position.set(0, .04, 1.72);
+      aircraft.add(tailWings);
+
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(.18, 1.05, .76), paint);
+      fin.position.set(0, .48, 1.62);
+      aircraft.add(fin);
+
+      const canopy = new THREE.Mesh(new THREE.SphereGeometry(.48, 10, 8), glass);
+      canopy.scale.set(.72, .7, 1.4);
+      canopy.position.set(0, .42, -.62);
+      aircraft.add(canopy);
+
+      const leftEngine = new THREE.Mesh(new THREE.CylinderGeometry(.22, .28, 1.35, 8), dark);
+      leftEngine.rotation.z = Math.PI / 2;
+      leftEngine.position.set(-1.4, -.16, .28);
+      aircraft.add(leftEngine);
+
+      const rightEngine = leftEngine.clone();
+      rightEngine.position.x = 1.4;
+      aircraft.add(rightEngine);
+
+      const propHub = new THREE.Mesh(new THREE.CylinderGeometry(.08, .08, .18, 8), dark);
+      propHub.rotation.z = Math.PI / 2;
+      propHub.position.set(0, 0, -3.12);
+      aircraft.add(propHub);
+
+      const propBlade = new THREE.Mesh(new THREE.BoxGeometry(1.65, .08, .08), dark);
+      propBlade.position.set(0, 0, -3.16);
+      aircraft.add(propBlade);
+
+      return aircraft;
+    }
+
+    function makeCarrier() {
+      const carrier = new THREE.Group();
+
+      const hull = new THREE.Mesh(
+        new THREE.BoxGeometry(9.8, 2.25, 35),
+        makeMaterial(0x34434a, { roughness: .82 })
+      );
+      hull.position.y = 1.08;
+      hull.castShadow = true;
+      carrier.add(hull);
+
+      const hullTop = makeDeck(10.4, 37, 0x44545a, 2.14);
+      carrier.add(hullTop);
+
+      const flightDeck = makeDeck(13.2, 42, 0x566269, 2.28);
+      carrier.add(flightDeck);
+
+      addBox(carrier, [1.9, .12, 29], 0xbac6bd, [-2.35, 2.36, -1.2], { castShadow: false });
+      addBox(carrier, [.22, .1, 31], 0xe4e0cb, [0, 2.37, -1], { castShadow: false });
+      addBox(carrier, [.2, .1, 31], 0xe4e0cb, [-5.8, 2.37, -1], { castShadow: false });
+      addBox(carrier, [10.3, .1, .18], 0xe4e0cb, [0, 2.37, -15], { castShadow: false });
+      addBox(carrier, [10.3, .1, .18], 0xe4e0cb, [0, 2.37, 13], { castShadow: false });
+
+      addBox(carrier, [2.6, 2.9, 4.8], 0x59666a, [4.0, 3.75, 1.8]);
+      addBox(carrier, [3.2, .4, 5.3], 0x38474c, [4.0, 5.36, 1.8]);
+      addBox(carrier, [1.8, .8, 2.4], 0x69767a, [4.0, 5.9, 1.8]);
+
+      const antenna = new THREE.Mesh(
+        new THREE.CylinderGeometry(.045, .06, 3.1, 7),
+        makeMaterial(0x303c40)
+      );
+      antenna.position.set(4.0, 7.5, 1.8);
+      carrier.add(antenna);
+
+      addBox(carrier, [2.7, .5, 3.5], 0x48575c, [-3.3, 2.65, 11]);
+      addBox(carrier, [2.7, .5, 3.5], 0x48575c, [3.0, 2.65, -11]);
+
+      return carrier;
+    }
+
+    function makeCruiser() {
+      const ship = new THREE.Group();
+
+      const hull = new THREE.Mesh(
+        new THREE.BoxGeometry(7.2, 2.15, 27),
+        makeMaterial(0x4b565b, { roughness: .82 })
+      );
+      hull.position.y = 1.04;
+      hull.castShadow = true;
+      ship.add(hull);
+      ship.add(makeDeck(8.0, 29, 0x647076, 2.05));
+
+      addBox(ship, [4.2, 1.1, 6.5], 0x758084, [0, 2.7, 2.5]);
+      addBox(ship, [3.2, 1.25, 4.5], 0x7e898a, [0, 3.85, 2.2]);
+      addBox(ship, [1.3, 2.1, 1.4], 0x536166, [0, 5.4, 2.6]);
+      addBox(ship, [1.0, 2.7, .16], 0x3e4a4f, [0, 6.4, 2.6]);
+
+      for (const z of [-8, -1, 8]) {
+        const base = new THREE.Mesh(
+          new THREE.CylinderGeometry(1.1, 1.25, .75, 12),
+          makeMaterial(0x414d51, { metalness: .18 })
+        );
+        base.position.set(0, 2.55, z);
+        ship.add(base);
+        addBox(ship, [.32, .3, 3.5], 0x374247, [0, 2.94, z - 1.45]);
+      }
+
+      for (const x of [-2.8, 2.8]) {
+        addBox(ship, [.8, .55, 1.2], 0x465358, [x, 2.6, 5]);
+      }
+
+      return ship;
+    }
+
+    function makeIsland(x, z, sx, sy, sz) {
+      const island = new THREE.Group();
+      island.position.set(x, 0, z);
+
+      const rock = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 22, 14),
+        makeMaterial(0x65756f, { roughness: 1 })
+      );
+      rock.scale.set(sx, sy, sz);
+      rock.position.y = sy * .15 - 1.0;
+      rock.castShadow = true;
+      island.add(rock);
+
+      const upper = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 16, 10),
+        makeMaterial(0x667d6b, { roughness: 1 })
+      );
+      upper.scale.set(sx * .72, sy * .64, sz * .7);
+      upper.position.set(-sx * .1, sy * .45, -sz * .05);
+      island.add(upper);
+
+      return island;
+    }
+
+    function makeCrane(parent, x, z) {
+      addBox(parent, [1.0, 18, 1.0], 0x37464a, [x, 9, z]);
+      addBox(parent, [20, .9, 1.1], 0x4a5b5e, [x + 8, 17, z]);
+      addBox(parent, [.35, 11, .35], 0x78817b, [x + 15, 11, z]);
+      addBox(parent, [4.0, .6, 3.8], 0x667173, [x, 1.4, z]);
+    }
+
+    let portCarrier = null;
+    let portAircraft = null;
+
+    function buildPortWorld() {
+      portCarrier = makeCarrier();
+      portGroup.add(portCarrier);
+
+      // Píeres, armazéns e guindastes para dar escala ao porto.
+      addBox(portGroup, [10, 2, 78], 0x4b595c, [-39, .3, 0]);
+      addBox(portGroup, [10, 2, 78], 0x4b595c, [39, .3, 0]);
+      addBox(portGroup, [88, 1.4, 9], 0x46565a, [0, .2, 39]);
+
+      makeCrane(portGroup, -49, -10);
+      makeCrane(portGroup, 48, 12);
+
+      for (const [x, z, color] of [
+        [-38, -19, 0x8c6e4f], [-38, -10, 0x596e72], [-38, 0, 0x7d6250],
+        [38, -20, 0x657c76], [38, -10, 0x9a784f], [38, 1, 0x576a73]
+      ]) {
+        addBox(portGroup, [6, 4, 7], color, [x, 3, z]);
+      }
+
+      updatePortAircraft();
+    }
+
+    function updatePortAircraft() {
+      if (!portCarrier) return;
+      if (portAircraft) {
+        portCarrier.remove(portAircraft);
+        disposeObject(portAircraft);
+      }
+      portAircraft = makeAircraft(nations[game.nation].paint);
+      portAircraft.position.set(-1.4, 2.75, -3.0);
+      portCarrier.add(portAircraft);
+    }
+
+    function disposeObject(root) {
+      root.traverse((object) => {
+        if (object.geometry) object.geometry.dispose();
+        if (object.material) {
+          const materials = Array.isArray(object.material) ? object.material : [object.material];
+          for (const material of materials) material.dispose();
+        }
+      });
+    }
+
+    // Porto permanente e fundo do mapa de combate.
+    buildPortWorld();
+
+    function setForwardVector() {
+      return new THREE.Vector3(-Math.sin(game.yaw), 0, -Math.cos(game.yaw));
+    }
+
+    function updateFormation() {
+      const offsets = [
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(-8, -1.2, 6),
+        new THREE.Vector3(8, -1.8, 6)
+      ];
+
+      for (let i = 0; i < game.planeMeshes.length; i++) {
+        const aircraft = game.planeMeshes[i];
+        aircraft.visible = i < game.planeCount;
+        const offset = offsets[i].clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), game.yaw);
+        aircraft.position.copy(game.planePos).add(offset);
+        aircraft.rotation.set(0, game.yaw, 0);
+      }
+    }
+
+    function clearBattleGroup() {
+      while (battleGroup.children.length) {
+        const child = battleGroup.children[0];
+        battleGroup.remove(child);
+        disposeObject(child);
+      }
+    }
+
+    const missions = [{name:'ACADEMIA NAVAL',hp:9000,move:0,pressure:0,reserve:9},{name:'PATRULHA INIMIGA',hp:16000,move:4,pressure:35,reserve:9},{name:'DEFESA DA FROTA',hp:22000,move:7,pressure:100,reserve:12}];
+    let mission, reserve, carrierHp, carrierMax, rounds, commandMode, cameraMode, paused, destination, targetRing, elapsed, selectedLoadout;
+    function setupBattle() {
+      clearBattleGroup();
+
+      game.projectiles = [];
+      game.pendingBatches = [];
+      game.effects = [];
+      game.tracers = [];
+      game.planeMeshes = [];
+      game.keys = {};
+      game.weapon = 'rockets';
+      game.cooldown = 0;
+
+      const ship = currentShip();
+      const nation = nations[game.nation];
+
+      game.carrierPos.set(0, 0, 112);
+      game.enemyPos.set(0, 0, -150);
+      game.planePos.set(0, 32, 76);
+      game.yaw = 0;
+      game.speed = 29 * nation.modifiers.speed * (1 + (ship.tier - 4) * .015);
+      game.altitude = 32;
+      game.planeCount = 3;
+      game.airHealth = 100;
+      game.returning = false;
+      game.docked = false;
+      game.rearmTimer = 0;
+      game.aaTimer = 0;
+      game.damageDone = 0;
+
+      mission=missions[Number($('missionSelect').value)]||missions[0]; reserve=mission.reserve; carrierMax=ship.hp; carrierHp=carrierMax; rounds=2; commandMode=false; cameraMode=0; paused=false; destination=null; elapsed=0; selectedLoadout='rockets'; $('pauseBtn').textContent='P · Pausar'; document.querySelector('.mission-title').textContent=mission.name;
+      game.enemyMaxHp = mission.hp + (ship.tier - 4) * 950;
+      game.enemyHp = game.enemyMaxHp;
+
+      game.carrierShip = makeCarrier();
+      game.carrierShip.position.copy(game.carrierPos);
+      battleGroup.add(game.carrierShip);
+
+      game.enemyShip = makeCruiser();
+      game.enemyShip.position.copy(game.enemyPos);
+      battleGroup.add(game.enemyShip);
+
+      targetRing = new THREE.Mesh(
+        new THREE.TorusGeometry(12, .22, 6, 56),
+        new THREE.MeshBasicMaterial({ color: 0xf08c79, transparent: true, opacity: .78 })
+      );
+      targetRing.rotation.x = Math.PI / 2;
+      targetRing.position.set(game.enemyPos.x, .8, game.enemyPos.z);
+      battleGroup.add(targetRing);
+
+      battleGroup.add(makeIsland(-155, -35, 38, 14, 47));
+      battleGroup.add(makeIsland(155, -205, 43, 16, 54));
+      battleGroup.add(makeIsland(-230, 170, 50, 17, 42));
+
+      for (let i = 0; i < 3; i++) {
+        const plane = makeAircraft(nation.paint);
+        battleGroup.add(plane);
+        game.planeMeshes.push(plane);
+      }
+
+      updateFormation();
+      game.battleActive = true;
+      game.battleWon = false;
+      game.hudTimer = 0;
+      updateBattleHUD(true);
+    }
+
+    // ---------- Porto e árvore tecnológica ----------
+
+    function updateXpLabels() {
+      $('xpValue').textContent = formatNumber(game.xp);
+      $('techXpValue').textContent = formatNumber(game.xp);
+    }
+
+    function updatePortPanel() {
+      const ship = currentShip();
+      const nation = nations[game.nation];
+
+      $('nationSelect').value = game.nation;
+      $('shipTier').textContent = `PORTA-AVIÕES · TIER ${['', '', '', '', 'IV', '', 'VI', '', 'VIII'][ship.tier] || ship.tier}`;
+      $('shipName').textContent = ship.name;
+      $('shipDescription').textContent = ship.description;
+      $('shipHp').textContent = formatNumber(ship.hp);
+      $('shipSpeed').textContent = `${Math.round(ship.speed * nation.modifiers.speed)} nós`;
+      $('doctrineText').textContent = nation.doctrine;
+
+      updateXpLabels();
+    }
+
+    function renderNationSelect() {
+      $('nationSelect').innerHTML = Object.entries(nations)
+        .map(([id, nation]) => `<option value="${id}">${nation.name}</option>`)
+        .join('');
+    }
+
+    function renderTechTree() {
+      $('treeGrid').innerHTML = Object.entries(nations).map(([nationId, nation]) => {
+        const nodes = nation.ships.map((ship) => {
+          const unlocked = unlockedShips.has(ship.id);
+          const selected = game.selectedShipId === ship.id;
+          const action = selected
+            ? 'EQUIPADO NO PORTO'
+            : unlocked
+              ? 'SELECIONAR PORTA-AVIÕES'
+              : `DESBLOQUEAR · ${formatNumber(ship.cost)} XP`;
+
+          return `
+            <button class="tech-node ${unlocked ? '' : 'locked'} ${selected ? 'selected' : ''}"
+                    data-node="${ship.id}" style="--nation-color:#${nation.paint.toString(16).padStart(6, '0')}">
+              <div class="node-top">
+                <b>TIER ${ship.tier}</b>
+                <span>${unlocked ? '● DISPONÍVEL' : '◆ BLOQUEADO'}</span>
+              </div>
+              <strong>${ship.name}</strong>
+              <small>${ship.description}</small>
+              <span class="node-action">${action}</span>
+            </button>`;
+        }).join('');
+
+        return `
+          <article class="nation-column" style="--nation-color:#${nation.paint.toString(16).padStart(6, '0')}">
+            <div class="nation-heading">
+              <div class="nation-emblem">${nation.emblem}</div>
+              <div><strong>${nation.name}</strong><small>${nation.doctrine}</small></div>
+            </div>
+            ${nodes}
+          </article>`;
+      }).join('');
+
+      document.querySelectorAll('[data-node]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const ship = findShip(button.dataset.node);
+          if (!ship) return;
+
+          if (!unlockedShips.has(ship.id)) {
+            if (game.xp < ship.cost) {
+              showToast(`Faltam ${formatNumber(ship.cost - game.xp)} XP para pesquisar este navio.`, 'warn');
+              return;
+            }
+            game.xp -= ship.cost;
+            unlockedShips.add(ship.id);
+            game.nation = ship.nationId;
+            game.selectedShipId = ship.id;
+            saveProgress();
+            updatePortAircraft();
+            updatePortPanel();
+            renderTechTree();
+            showToast(`${ship.name} pesquisado e equipado no porto.`);
+            return;
+          }
+
+          game.nation = ship.nationId;
+          game.selectedShipId = ship.id;
+          saveProgress();
+          updatePortAircraft();
+          updatePortPanel();
+          renderTechTree();
+          showToast(`${ship.name} selecionado para a próxima operação.`);
+        });
+      });
+
+      updateXpLabels();
+    }
+
+    function chooseNation(nationId) {
+      if (!nations[nationId]) return;
+
+      game.nation = nationId;
+      const available = nations[nationId].ships
+        .slice()
+        .reverse()
+        .find((ship) => unlockedShips.has(ship.id));
+
+      if (available) game.selectedShipId = available.id;
+
+      updatePortAircraft();
+      updatePortPanel();
+      renderTechTree();
+      saveProgress();
+    }
+
+    // ---------- Combate e armamentos ----------
+
+    const weapons = {
+      rockets: {
+        name: 'FOGUETES',
+        minRange: 25,
+        maxRange: 250,
+        cone: 27 * Math.PI / 180,
+        damage: 2350,
+        cooldown: 7,
+        projectileSpeed: 165,
+        impactY: 4.5,
+        color: 0xffb56c
+      },
+      torpedoes: {
+        name: 'TORPEDOS',
+        minRange: 38,
+        maxRange: 184,
+        cone: 15 * Math.PI / 180,
+        damage: 4300,
+        cooldown: 9,
+        projectileSpeed: 76,
+        impactY: 1.2,
+        color: 0x71d9e5
+      },
+      bombs: {
+        name: 'BOMBAS',
+        minRange: 24,
+        maxRange: 153,
+        cone: 22 * Math.PI / 180,
+        damage: 3400,
+        cooldown: 8,
+        projectileSpeed: 96,
+        impactY: 2.6,
+        color: 0xffd17d
+      }
+    };
+
+    function setWeapon(weapon) {
+      if (!weapons[weapon]) return;
+      if(game.battleActive && !game.docked && weapon!==selectedLoadout){showToast('Troque o tipo de esquadrão no convés.','warn');return;}
+      selectedLoadout=weapon;
+      game.weapon = weapon;
+
+      document.querySelectorAll('.weapon-btn').forEach((button) => {
+        button.classList.toggle('active', button.dataset.weapon === weapon);
+      });
+
+      updateBattleHUD(true);
+    }
+
+    function createProjectileMesh(type, color) {
+      let geometry;
+      let material;
+
+      if (type === 'rockets') {
+        geometry = new THREE.ConeGeometry(.19, 1.25, 7);
+        material = new THREE.MeshStandardMaterial({ color, emissive: 0x672c0c, emissiveIntensity: .5 });
+      } else if (type === 'torpedoes') {
+        geometry = new THREE.CylinderGeometry(.19, .24, 2.3, 8);
+        material = new THREE.MeshStandardMaterial({ color, metalness: .35, roughness: .35 });
+      } else {
+        geometry = new THREE.SphereGeometry(.39, 10, 8);
+        material = new THREE.MeshStandardMaterial({ color, metalness: .12, roughness: .58 });
+      }
+
+      return new THREE.Mesh(geometry, material);
+    }
+
+    function launchAttack() {
+      if (game.screen !== 'battle' || !game.battleActive) return;
+      if (game.docked || game.returning) {
+        showToast('O esquadrão precisa estar em voo para atacar.', 'warn');
+        return;
+      }
+      if (game.cooldown > 0) {
+        showToast(`Armamento recarregando: ${Math.ceil(game.cooldown)} s.`, 'warn');
+        return;
+      }
+
+      if(commandMode || paused) return;
+      if(rounds<=0){showToast('Munição esgotada. Retorne ao convés.','warn');return;}
+      const weapon = game.weapon;
+      if((weapon==='torpedoes' && game.altitude>22)||(weapon==='bombs' && game.altitude<35)){showToast('Altitude inadequada para esta aeronave.','warn');return;}
+      rounds--;
+      const definition = weapons[weapon];
+      const targetVector = game.enemyPos.clone().sub(game.planePos);
+      targetVector.y = 0;
+      const distance = targetVector.length();
+      const targetDirection = targetVector.clone().normalize();
+      const forward = setForwardVector();
+      const alignment = clamp(forward.dot(targetDirection), -1, 1);
+      const angle = Math.acos(alignment);
+      const inRange = distance >= definition.minRange && distance <= definition.maxRange;
+      const aligned = angle <= definition.cone;
+      const hit = inRange && aligned;
+
+      let reason = 'alinhamento insuficiente';
+      if (!inRange) reason = distance < definition.minRange ? 'alvo próximo demais' : 'alvo fora de alcance';
+      else if (!aligned) reason = 'alvo fora do cone de ataque';
+
+      const targetPoint = hit
+        ? new THREE.Vector3(game.enemyPos.x, definition.impactY, game.enemyPos.z)
+        : game.planePos.clone().add(forward.clone().multiplyScalar(Math.min(55, distance * .38)));
+
+      const nation = nations[game.nation];
+      const ship = currentShip();
+      const quality = Math.max(.62, 1 - (angle / definition.cone) * .28);
+      const tierBonus = 1 + (ship.tier - 4) * .035;
+      const damage = hit
+        ? Math.round(definition.damage * nation.modifiers[weapon] * tierBonus * quality * (game.planeCount / 3))
+        : 0;
+
+      const numberOfShots = weapon === 'rockets' ? 6 : 3;
+      const maxDuration = { value: .55 };
+
+      for (let i = 0; i < numberOfShots; i++) {
+        const planeIndex = i % Math.max(1, game.planeCount);
+        const aircraft = game.planeMeshes[planeIndex];
+        const spread = (i - (numberOfShots - 1) / 2) * .018;
+        const direction = forward.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), spread).normalize();
+
+        const start = aircraft
+          ? aircraft.position.clone()
+          : game.planePos.clone();
+
+        if (weapon === 'torpedoes') start.y = Math.max(4, start.y - 12);
+        else start.y -= 1.5;
+
+        const end = hit
+          ? targetPoint.clone().add(new THREE.Vector3(spread * 22, 0, spread * 13))
+          : start.clone().add(direction.clone().multiplyScalar(48));
+
+        const horizontalDistance = Math.hypot(end.x - start.x, end.z - start.z);
+        const duration = hit
+          ? clamp(horizontalDistance / definition.projectileSpeed, .55, 2.25)
+          : .55;
+
+        maxDuration.value = Math.max(maxDuration.value, duration);
+
+        const projectile = createProjectileMesh(weapon, definition.color);
+        projectile.position.copy(start);
+
+        if (weapon !== 'bombs') {
+          projectile.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+        }
+
+        battleGroup.add(projectile);
+        game.projectiles.push({
+          mesh: projectile,
+          start,
+          end,
+          direction,
+          type: weapon,
+          elapsed: 0,
+          duration
+        });
+      }
+
+      game.pendingBatches.push({
+        elapsed: 0,
+        duration: maxDuration.value,
+        hit,
+        reason,
+        damage,
+        target: targetPoint.clone(),
+        weapon
+      });
+
+      game.cooldown = definition.cooldown;
+      showToast(`${definition.name}: esquadrão em ataque.`);
+      updateBattleHUD(true);
+    }
+
+    function spawnImpact(position, hit, weapon) {
+      const color = hit ? weapons[weapon].color : 0x8ac8d0;
+
+      const burst = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 14, 10),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .9 })
+      );
+      burst.position.copy(position);
+      battleGroup.add(burst);
+      game.effects.push({ mesh: burst, age: 0, life: .85, kind: 'burst' });
+
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(.8, 1.2, 28),
+        new THREE.MeshBasicMaterial({ color: hit ? 0xf5d0a0 : 0x9de3e3, transparent: true, opacity: .8, side: THREE.DoubleSide })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(position.x, .55, position.z);
+      battleGroup.add(ring);
+      game.effects.push({ mesh: ring, age: 0, life: 1.1, kind: 'ring' });
+    }
+
+    function resolveBatches(dt) {
+      for (let i = game.pendingBatches.length - 1; i >= 0; i--) {
+        const batch = game.pendingBatches[i];
+        batch.elapsed += dt;
+        if (batch.elapsed < batch.duration) continue;
+
+        if (batch.hit && batch.target.distanceTo(new THREE.Vector3(game.enemyPos.x,batch.target.y,game.enemyPos.z)) < 15) {
+          game.enemyHp = Math.max(0, game.enemyHp - batch.damage);
+          game.damageDone += batch.damage;
+          spawnImpact(batch.target, true, batch.weapon);
+          showToast(`${weapons[batch.weapon].name}: impacto confirmado · −${formatNumber(batch.damage)} HP.`);
+          if (game.enemyHp <= 0) finishBattle(true);
+        } else {
+          spawnImpact(batch.target, false, batch.weapon);
+          showToast(`${weapons[batch.weapon].name}: ataque falhou — ${batch.reason}.`, 'warn');
+        }
+
+        game.pendingBatches.splice(i, 1);
+      }
+    }
+
+    function updateProjectiles(dt) {
+      for (let i = game.projectiles.length - 1; i >= 0; i--) {
+        const projectile = game.projectiles[i];
+        projectile.elapsed += dt;
+        const t = clamp(projectile.elapsed / projectile.duration, 0, 1);
+        const position = projectile.start.clone().lerp(projectile.end, t);
+
+        if (projectile.type === 'torpedoes') {
+          position.y = Math.max(1.15, projectile.start.y - t * 46);
+        } else if (projectile.type === 'bombs') {
+          position.y -= Math.sin(Math.PI * t) * 2.5;
+        }
+
+        projectile.mesh.position.copy(position);
+
+        if (projectile.elapsed >= projectile.duration) {
+          battleGroup.remove(projectile.mesh);
+          disposeObject(projectile.mesh);
+          game.projectiles.splice(i, 1);
+        }
+      }
+
+      resolveBatches(dt);
+    }
+
+    function updateEffects(dt) {
+      for (let i = game.effects.length - 1; i >= 0; i--) {
+        const effect = game.effects[i];
+        effect.age += dt;
+        const t = clamp(effect.age / effect.life, 0, 1);
+
+        if (effect.kind === 'ring') {
+          effect.mesh.scale.setScalar(1 + t * 7);
+        } else {
+          effect.mesh.scale.setScalar(.4 + t * 5.5);
+        }
+
+        if (effect.mesh.material) effect.mesh.material.opacity = .88 * (1 - t);
+
+        if (effect.age >= effect.life) {
+          battleGroup.remove(effect.mesh);
+          disposeObject(effect.mesh);
+          game.effects.splice(i, 1);
+        }
+      }
+    }
+
+    function spawnTracer() {
+      if (!game.planePos || !game.enemyShip) return;
+
+      const start = new THREE.Vector3(game.enemyPos.x, 4.7, game.enemyPos.z);
+      const end = game.planePos.clone();
+      const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+      const material = new THREE.LineBasicMaterial({ color: 0xffc477, transparent: true, opacity: .78 });
+      const tracer = new THREE.Line(geometry, material);
+      battleGroup.add(tracer);
+      game.tracers.push({ mesh: tracer, age: 0, life: .32 });
+    }
+
+    function updateTracers(dt) {
+      for (let i = game.tracers.length - 1; i >= 0; i--) {
+        const tracer = game.tracers[i];
+        tracer.age += dt;
+        tracer.mesh.material.opacity = Math.max(0, 1 - tracer.age / tracer.life);
+        if (tracer.age >= tracer.life) {
+          battleGroup.remove(tracer.mesh);
+          disposeObject(tracer.mesh);
+          game.tracers.splice(i, 1);
+        }
+      }
+    }
+
+    function applyAntiAircraft(dt) {
+      if (game.docked || !game.enemyShip || game.planeCount===0) return;
+
+      const dx = game.planePos.x - game.enemyPos.x;
+      const dz = game.planePos.z - game.enemyPos.z;
+      const distance = Math.hypot(dx, dz);
+
+      if (distance > 96) {
+        game.aaTimer = 0;
+        return;
+      }
+
+      game.aaTimer += dt;
+      if (game.aaTimer < 1.8) return;
+
+      game.aaTimer = 0;
+      const nation = nations[game.nation];
+      const damage = 10 / nation.modifiers.toughness;
+      game.airHealth -= damage;
+      spawnTracer();
+
+      if (game.airHealth <= 0) {
+        if (game.planeCount > 1) {
+          game.planeCount--;
+          game.airHealth = 68;
+          showToast(`Fogo antiaéreo: uma aeronave perdida. ${game.planeCount} restantes.`, 'danger');
+        } else {
+          game.planeCount=0; game.airHealth=0; game.docked=true; game.returning=false; game.rearmTimer=6; commandMode=true; game.planePos.copy(game.carrierPos); game.planePos.y=6;
+          showToast('Esquadrão perdido. Prepare outro no convés.', 'danger'); if(reserve===0)finishBattle(false);
+        }
+      }
+    }
+
+    function beginReturn() {
+      if (!game.battleActive) return;
+
+      if (game.docked) {
+        if(game.rearmTimer>0 || game.planeCount===0){showToast('Aguarde o rearme ou reposição.','warn');return;}
+        rounds=2; commandMode=false;
+        game.docked = false;
+        game.returning = false;
+        game.planePos.set(game.carrierPos.x, 32, game.carrierPos.z - 36);
+        game.altitude = 32;
+        game.yaw = 0;
+        game.speed = 25 * nations[game.nation].modifiers.speed;
+        game.airHealth = 100;
+        game.cooldown = 0;
+        updateFormation();
+        showToast('Esquadrão lançado. Boa caçada.');
+        updateBattleHUD(true);
+        return;
+      }
+
+      if (game.returning) {
+        game.returning = false;
+        showToast('Retorno cancelado. Controle de voo restabelecido.', 'warn');
+      } else {
+        game.returning = true;
+        showToast('Retornando ao porta-aviões. O esquadrão será rearmado.');
+      }
+      updateBattleHUD(true);
+    }
+
+    function updateReturnFlight(dt) {
+      const toCarrier = game.carrierPos.clone().sub(game.planePos);
+      toCarrier.y = 0;
+      const distance = toCarrier.length();
+
+      if (distance < 20) {
+        game.returning = false;
+        game.docked = true;
+        game.rearmTimer = 6;
+        game.speed = 0;
+        game.planePos.set(game.carrierPos.x, 6, game.carrierPos.z - 1);
+        game.altitude = 6;
+        showToast('Esquadrão no convés. Rearme e reposição em andamento.');
+        updateFormation();
+        updateBattleHUD(true);
+        return;
+      }
+
+      const direction = toCarrier.normalize();
+      const desiredYaw = Math.atan2(-direction.x, -direction.z);
+      let deltaYaw = desiredYaw - game.yaw;
+      while (deltaYaw > Math.PI) deltaYaw -= Math.PI * 2;
+      while (deltaYaw < -Math.PI) deltaYaw += Math.PI * 2;
+
+      game.yaw += deltaYaw * Math.min(1, dt * 1.7);
+      game.speed = 42 * nations[game.nation].modifiers.speed;
+      game.planePos.addScaledVector(setForwardVector(), game.speed * dt);
+    }
+
+    function updateManualFlight(dt) {
+      const keys = game.keys;
+      const turnInput = (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0);
+      game.yaw += turnInput * 0.78 * dt;
+
+      let desiredSpeed = 29 * nations[game.nation].modifiers.speed;
+      if (keys.KeyW) desiredSpeed = 48 * nations[game.nation].modifiers.speed;
+      if (keys.KeyS) desiredSpeed = 13 * nations[game.nation].modifiers.speed;
+      if (keys.ShiftLeft || keys.ShiftRight) desiredSpeed *= 1.22;
+
+      game.speed += (desiredSpeed - game.speed) * Math.min(1, dt * 1.4);
+
+      if (keys.KeyE) game.altitude += 15 * dt;
+      if (keys.KeyQ) game.altitude -= 15 * dt;
+      game.altitude = clamp(game.altitude, 12, 72);
+      game.planePos.y = game.altitude;
+
+      game.planePos.addScaledVector(setForwardVector(), game.speed * dt);
+    }
+
+    function updateBattle(dt) {
+      if (game.screen !== 'battle' || paused) return;
+      if (game.battleActive) {
+        elapsed+=dt;
+        if(destination){const v=destination.clone().sub(game.carrierPos);if(v.length()>2){game.carrierPos.addScaledVector(v.normalize(),Math.min(5*dt,game.carrierPos.distanceTo(destination)));game.carrierShip.rotation.y=Math.atan2(-v.x,-v.z);game.carrierShip.position.copy(game.carrierPos);}}
+        game.enemyPos.x+=Math.cos(elapsed*.09)*mission.move*dt;game.enemyShip.position.copy(game.enemyPos);targetRing.position.set(game.enemyPos.x,.8,game.enemyPos.z);
+        carrierHp=Math.max(0,carrierHp-mission.pressure*dt);if(carrierHp<=0){finishBattle(false);return;}
+        if(game.docked){game.planePos.copy(game.carrierPos);game.planePos.y=6;}
+
+        game.cooldown = Math.max(0, game.cooldown - dt);
+
+        if (game.docked) {
+          game.rearmTimer = Math.max(0, game.rearmTimer - dt);
+          if (game.rearmTimer <= 0 && game.planeCount < 3 && reserve>0) {
+            const added=Math.min(3-game.planeCount,reserve); reserve-=added; game.planeCount+=added;
+            game.airHealth = 100;
+            showToast('Esquadrão reabastecido e pronto para nova surtida.');
+          }
+        } else if (game.returning) {
+          updateReturnFlight(dt);
+        } else {
+          updateManualFlight(dt);
+        }
+
+        updateFormation();
+        applyAntiAircraft(dt);
+      }
+
+      updateProjectiles(dt);
+      updateEffects(dt);
+      updateTracers(dt);
+      updateBattleHUD(); drawRadar();
+    }
+    function drawRadar(){const c=$('radar'),ctx=c.getContext('2d');ctx.clearRect(0,0,200,160);ctx.strokeStyle='#345763';for(let i=0;i<200;i+=20){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,160);ctx.stroke();}for(let i=0;i<160;i+=20){ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(200,i);ctx.stroke();}for(const [p,col] of [[game.carrierPos,'#65d3c6'],[game.enemyPos,'#f17a72'],[game.planePos,'#e8bd78'],...(destination?[[destination,'#ffffff']]:[])]){ctx.fillStyle=col;ctx.fillRect(100+p.x/5-3,80+p.z/5-3,6,6);} $('commandStatus').textContent=`Casco: ${Math.round(carrierHp)} / ${carrierMax} · Reserva: ${reserve} · Salvas: ${rounds} · Altitude: ${Math.round(game.altitude)} · ${commandMode?'COMANDO':'VOO'}`;}
+    $('radar').onclick=e=>{const b=e.currentTarget.getBoundingClientRect();destination=new THREE.Vector3(((e.clientX-b.left)/b.width*200-100)*5,0,((e.clientY-b.top)/b.height*160-80)*5);};
+    function toggleCommand(){commandMode=!commandMode;if(commandMode&&!game.docked)game.returning=true;}
+    function togglePause(){paused=!paused;$('pauseBtn').textContent=paused?'P · Continuar':'P · Pausar';game.keys={};}
+    $('modeBtn').onclick=toggleCommand;$('viewBtn').onclick=()=>cameraMode=(cameraMode+1)%3;$('pauseBtn').onclick=togglePause;$('abortBtn').onclick=()=>finishBattle(false);
+
+
+    function updateBattleHUD(force = false) {
+      if (game.screen !== 'battle') return;
+      if (!force && game.hudTimer > 0) return;
+
+      game.hudTimer = .12;
+
+      const definition = weapons[game.weapon];
+      const targetVector = game.enemyPos.clone().sub(game.planePos);
+      targetVector.y = 0;
+      const distance = targetVector.length();
+      const targetDirection = distance > 0 ? targetVector.normalize() : new THREE.Vector3(0, 0, -1);
+      const aligned = setForwardVector().dot(targetDirection) >= Math.cos(definition.cone);
+      const inRange = distance >= definition.minRange && distance <= definition.maxRange;
+
+      $('enemyHpBar').style.width = `${clamp((game.enemyHp / game.enemyMaxHp) * 100, 0, 100)}%`;
+      $('enemyHpText').textContent = `${formatNumber(game.enemyHp)} / ${formatNumber(game.enemyMaxHp)} HP`;
+      $('planeCount').textContent = `${String(game.planeCount).padStart(2, '0')} / 03`;
+      $('speedReadout').textContent = `${Math.round(game.speed * 1.94384)} NÓS`;
+      $('airHealthBar').style.width = `${clamp(game.airHealth, 0, 100)}%`;
+      $('airHealthText').textContent = `${Math.round(game.airHealth)}%`;
+
+      $('distanceReadout').textContent =
+        `DISTÂNCIA ${Math.round(distance)} m · ${aligned ? 'ALINHADO' : 'AJUSTE O RUMO'} · ${inRange ? 'NO ALCANCE' : 'FORA DO ALCANCE'}`;
+
+      if (game.docked) {
+        $('flightStatus').textContent = game.rearmTimer > 0
+          ? `REARMANDO · ${Math.ceil(game.rearmTimer)} S`
+          : 'NO CONVÉS · PRONTO PARA LANÇAR';
+      } else if (game.returning) {
+        $('flightStatus').textContent = 'RETORNANDO AO PORTA-AVIÕES';
+      } else {
+        $('flightStatus').textContent = 'EM VOO · CONTROLE MANUAL';
+      }
+
+      $('rtbBtn').textContent = game.docked
+        ? 'LANÇAR ESQUADRÃO'
+        : game.returning
+          ? 'CANCELAR RETORNO · R'
+          : 'RETORNAR AO PORTA-AVIÕES · R';
+
+      $('cooldownReadout').textContent = game.cooldown > 0
+        ? `REARME ${game.cooldown.toFixed(1)} S`
+        : 'PRONTO';
+
+      $('attackBtn').disabled =
+        !game.battleActive || game.cooldown > 0 || game.docked || game.returning;
+
+      document.querySelectorAll('.weapon-btn').forEach((button) => {
+        button.classList.toggle('active', button.dataset.weapon === game.weapon);
+      });
+    }
+
+    function finishBattle(victory) {
+      if (!game.battleActive) return;
+
+      game.battleActive = false;
+      game.battleWon = victory;
+
+      if (victory) {
+        const reward = 500 + Math.round(game.damageDone * .012);
+        game.xp += reward;
+        saveProgress();
+        updateXpLabels();
+        $('resultTitle').textContent = 'VITÓRIA';
+        $('resultText').textContent =
+          `Grupo de superfície neutralizado. Dano causado: ${formatNumber(game.damageDone)}. Recompensa: ${formatNumber(reward)} XP.`;
+      } else {
+        $('resultTitle').textContent = 'OPERAÇÃO ENCERRADA';
+        $('resultText').textContent = 'A operação terminou. Regresse ao porto para preparar uma nova surtida.';
+      }
+
+      $('resultModal').classList.remove('hidden');
+      renderTechTree();
+    }
+
+    function startBattle() {
+      $('resultModal').classList.add('hidden');
+      setupBattle();
+      showScreen('battle');
+      showToast(`${nations[game.nation].name} · esquadrão de três aeronaves lançado.`);
+    }
+
+    // ---------- Navegação e interface ----------
+
+    let toastTimer = 0;
+
+    function showToast(message, type = '') {
+      const toast = $('toast');
+      toast.textContent = message;
+      toast.className = `toast show ${type}`;
+      window.clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(() => toast.classList.remove('show'), 2600);
+    }
+
+    function showScreen(screen) {
+      game.screen = screen;
+
+      $('portScreen').classList.toggle('active', screen === 'port');
+      $('techScreen').classList.toggle('active', screen === 'tech');
+      $('battleUI').classList.toggle('hidden', screen !== 'battle');
+
+      document.body.classList.toggle('in-battle', screen === 'battle');
+      portGroup.visible = screen !== 'battle';
+      battleGroup.visible = screen === 'battle';
+
+      document.querySelectorAll('[data-nav]').forEach((button) => {
+        button.classList.toggle('active', button.dataset.nav === screen);
+      });
+
+      if (screen !== 'battle') game.keys = {};
+    }
+
+    document.querySelectorAll('[data-nav]').forEach((button) => {
+      button.addEventListener('click', () => showScreen(button.dataset.nav));
+    });
+
+    renderNationSelect();
+    updatePortPanel();
+    renderTechTree();
+
+    $('nationSelect').addEventListener('change', (event) => {
+      chooseNation(event.target.value);
+    });
+
+    $('startBattleBtn').addEventListener('click', startBattle);
+    $('attackBtn').addEventListener('click', launchAttack);
+    $('rtbBtn').addEventListener('click', beginReturn);
+
+    document.querySelectorAll('.weapon-btn').forEach((button) => {
+      button.addEventListener('click', () => setWeapon(button.dataset.weapon));
+    });
+
+    $('rematchBtn').addEventListener('click', startBattle);
+    $('returnPortBtn').addEventListener('click', () => {
+      $('resultModal').classList.add('hidden');
+      game.battleActive = false;
+      showScreen('port');
+      updatePortPanel();
+    });
+
+    $('fullscreenBtn').addEventListener('click', () => {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+      else document.exitFullscreen?.();
+    });
+
+    const controlCodes = new Set([
+      'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE',
+      'Space', 'KeyR', 'Digit1', 'Digit2', 'Digit3',
+      'ShiftLeft', 'ShiftRight'
+    ]);
+
+    document.addEventListener('keydown', (event) => {
+      if (game.screen !== 'battle') return;
+
+      if (controlCodes.has(event.code)) event.preventDefault();
+      game.keys[event.code] = true;
+
+      if (event.repeat) return;
+
+      if(['Tab','KeyP','KeyV','KeyM'].includes(event.code))event.preventDefault(); if(event.code==='Tab')toggleCommand();if(event.code==='KeyP')togglePause();if(event.code==='KeyV')cameraMode=(cameraMode+1)%3;if(event.code==='KeyM')$('radar').classList.toggle('hidden');if(paused)return; if (event.code === 'Space') launchAttack();
+      if (event.code === 'KeyR') beginReturn();
+      if (event.code === 'Digit1') setWeapon('rockets');
+      if (event.code === 'Digit2') setWeapon('torpedoes');
+      if (event.code === 'Digit3') setWeapon('bombs');
+    });
+
+    document.addEventListener('keyup', (event) => {
+      game.keys[event.code] = false;
+    });
+
+    window.addEventListener('blur', () => { game.keys = {}; });
+
+    // ---------- Câmera, água e renderização ----------
+
+    const portCameraPosition = new THREE.Vector3(78, 58, 105);
+    const portCameraTarget = new THREE.Vector3(4, 5, -1);
+    const techCameraPosition = new THREE.Vector3(70, 70, 124);
+    let lastWaterNormalUpdate = -1;
+
+    function updateWater(time) {
+      const attribute = waterGeometry.attributes.position;
+      const step = Math.floor(time * 8);
+
+      for (let i = 0; i < attribute.count; i++) {
+        const x = waterBase[i * 3];
+        const z = waterBase[i * 3 + 2];
+        const wave = Math.sin(x * .018 + time * .7) * .14 +
+                     Math.cos(z * .021 - time * .55) * .13;
+        attribute.setY(i, wave);
+      }
+
+      attribute.needsUpdate = true;
+
+      if (step !== lastWaterNormalUpdate) {
+        waterGeometry.computeVertexNormals();
+        lastWaterNormalUpdate = step;
+      }
+    }
+
+    function updateCamera(dt) {
+      const smoothing = 1 - Math.exp(-dt * 2.6);
+
+      if (game.screen === 'battle' && game.planePos) {
+        if(commandMode){camera.position.lerp(game.carrierPos.clone().add(new THREE.Vector3(55,75,85)),smoothing);camera.lookAt(game.carrierPos);return;}
+        if(cameraMode===1){camera.position.lerp(game.planePos.clone().add(new THREE.Vector3(0,100,0.01)),smoothing);camera.lookAt(game.planePos);return;}
+        if(cameraMode===2){camera.position.lerp(game.planePos.clone().add(new THREE.Vector3(45,12,0)),smoothing);camera.lookAt(game.planePos);return;}
+        const forward = setForwardVector();
+        const behind = forward.clone().multiplyScalar(-38);
+        const desired = game.planePos.clone()
+          .add(behind)
+          .add(new THREE.Vector3(0, 19, 0));
+
+        const lookAt = game.planePos.clone()
+          .add(forward.clone().multiplyScalar(42))
+          .add(new THREE.Vector3(0, -8, 0));
+
+        camera.position.lerp(desired, smoothing);
+        camera.lookAt(lookAt);
+        return;
+      }
+
+      const position = game.screen === 'tech' ? techCameraPosition : portCameraPosition;
+      camera.position.lerp(position, smoothing);
+      camera.lookAt(portCameraTarget);
+    }
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const dt = Math.min(clock.getDelta(), .05);
+      game.hudTimer = Math.max(0, game.hudTimer - dt);
+
+      updateWater(clock.elapsedTime);
+      updateBattle(dt);
+      updateCamera(dt);
+
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    showScreen('port');
+    animate();
+  </script>
+<div style="position:fixed;right:12px;top:82px;z-index:12;font:10px system-ui;color:#d6b275;pointer-events:none">Walney Moreira Klein — walneyk@hotmail.com · MIT</div>
+</body>
+</html>
